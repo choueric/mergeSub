@@ -13,23 +13,47 @@ func Test_Str2TimeCode(t *testing.T) {
 	str := "12:34:56,789"
 	var tc TimeCode
 	Str2TimeCode(str, &tc)
-	fmt.Println(tc)
-	fmt.Println(&tc)
+
+	newStr := tc.String()
+	if newStr != str {
+		t.Error("tc String wrong:", newStr)
+	}
 }
 
 func Test_Add(t *testing.T) {
 	str := "11:11:11,111"
 	var tc TimeCode
 	Str2TimeCode(str, &tc)
-	fmt.Println(tc)
 
 	tc.Add(str)
-	fmt.Println(tc)
+	newStr := tc.String()
+	if newStr != "22:22:22,222" {
+		t.Error("tc String wrong:", newStr)
+	}
 }
 
 func Test_Merge(t *testing.T) {
-	srt1 := "1\n00:00:00,000 --> 00:00:11,111\nFirst Line\n\n2\n00:00:22,222 --> 00:00:33,333\nSecond\n\n"
-	srt2 := "1\n00:00:01,001 --> 00:00:02,002\nThird\n\n2\n00:00:03,003 --> 00:00:04,004\nFour\n\n"
+	srt1 := `1
+00:00:00,000 --> 00:00:11,111
+First Line
+First Line2
+
+2
+00:00:22,222 --> 00:00:33,333
+Second
+Second 2
+
+`
+	srt2 := `1
+00:00:01,001 --> 00:00:02,002
+Third
+Third 2
+
+2
+00:00:03,003 --> 00:00:04,004
+Four
+
+`
 	offset := []string{"00:10:20,300"}
 
 	fmt.Printf("----------- srt1 -------------\n")
@@ -48,7 +72,6 @@ func Test_Merge(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
 	lists := []*list.List{list1, list2}
 
 	MergeSrt(lists, offset)
@@ -60,5 +83,4 @@ func Test_Merge(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
 }
