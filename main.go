@@ -25,9 +25,15 @@ func parseOptions() error {
 	inputSubs = strings.Split(inputSubsStr, ";")
 	timeOffset = strings.Split(timeOffsetStr, ";")
 
-	fmt.Println("input sub files:", inputSubs)
-	fmt.Println("output sub file:", outputSub)
-	fmt.Println("time offset:", timeOffset)
+	fmt.Println("- input sub files:")
+	for i, v := range inputSubs {
+		fmt.Println(" ", i, ":", v)
+	}
+	fmt.Println("- output sub file:\n ", outputSub)
+	fmt.Println("- time offset:")
+	for i, v := range timeOffset {
+		fmt.Println(" ", i, ":", v)
+	}
 
 	return nil
 }
