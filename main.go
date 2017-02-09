@@ -45,15 +45,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	srtFileNum := len(inputSubs)
-	srtLists := make([]*list.List, srtFileNum)
+	fileNum := len(inputSubs)
+	srtLists := make([]*list.List, fileNum)
+	wait := make(chan int, fileNum)
 
 	for i, v := range inputSubs {
-		srtLists[i], err = ReadSrtFile(v)
-		if err != nil {
-			fmt.Println("ReadStrFile:", err)
-			os.Exit(1)
-		}
+		go func(index int, filename string, c chan int) {
+			srtLists[index], err = ReadSrtFile(filename)
+			if err != nil {
+				fmt.Println("ReadStrFile:", err)
+				os.Exit(1)
+			}
+			c <- 1
+		}(i, v, wait)
+	}
+
+	for i := 0; i < fileNum; i++ {
+		<-wait
 	}
 
 	MergeSrt(srtLists, timeOffset)
