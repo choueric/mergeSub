@@ -12,10 +12,14 @@ import (
 var (
 	inputSubsStr  string
 	timeOffsetStr string
+	formatStr     string
 
 	inputSubs  []string
 	outputSub  string
 	timeOffset []string
+	lineEnd    string
+
+	debug bool
 )
 
 func parseOptions() error {
@@ -24,6 +28,15 @@ func parseOptions() error {
 	}
 	inputSubs = strings.Split(inputSubsStr, ";")
 	timeOffset = strings.Split(timeOffsetStr, ";")
+
+	switch formatStr {
+	case "unix":
+		lineEnd = "\n"
+	case "dos":
+		lineEnd = "\r\n"
+	default:
+		return errors.New("invalid format string.")
+	}
 
 	fmt.Println("- input sub files:")
 	for i, v := range inputSubs {
@@ -34,6 +47,7 @@ func parseOptions() error {
 	for i, v := range timeOffset {
 		fmt.Println(" ", i, ":", v)
 	}
+	fmt.Println("- output format:", formatStr)
 
 	return nil
 }
@@ -42,6 +56,8 @@ func main() {
 	flag.StringVar(&inputSubsStr, "i", "", "input subtitle files, separated by ';'.")
 	flag.StringVar(&outputSub, "o", "", "ouput subtitle file.")
 	flag.StringVar(&timeOffsetStr, "t", "", "time offset, separated by ';'.")
+	flag.StringVar(&formatStr, "f", "unix", "output file format, unix or dos.")
+	flag.BoolVar(&debug, "d", false, "enable debug message.")
 	flag.Parse()
 
 	err := parseOptions()

@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"container/list"
-	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -59,7 +59,8 @@ type SrtItem struct {
 }
 
 func (i SrtItem) String() string {
-	return fmt.Sprintf("%d\n%v --> %v\n%s\n", i.Counter, i.StartTime, i.EndTime, i.Text)
+	return fmt.Sprintf("%d%s%v --> %v%s%s%s", i.Counter, lineEnd, i.StartTime,
+		i.EndTime, lineEnd, i.Text, lineEnd)
 }
 
 func readLine(r *bufio.Reader) (string, error) {
@@ -69,44 +70,76 @@ func readLine(r *bufio.Reader) (string, error) {
 	}
 
 	str = strings.Trim(str, "\r\n")
-	if str == "" {
-		return "", errors.New("srt: blank line")
-	}
 	return str, nil
+}
+
+func processText(reader *bufio.Reader, item *SrtItem) (string, error) {
+	for {
+		str, err := readLine(reader)
+		if err != nil {
+			return "", err
+		}
+
+		if str != "" {
+			item.Text = item.Text + str + lineEnd
+		} else {
+			for {
+				nextLine, err := readLine(reader)
+				if err != nil {
+					return "", err
+				}
+
+				if nextLine != "" {
+					return nextLine, nil
+				}
+				item.Text = item.Text + str + lineEnd
+			}
+		}
+	}
 }
 
 func doReadSrt(reader *bufio.Reader) (*list.List, error) {
 	l := list.New()
+	counterLine, err := readLine(reader)
+	if err != nil {
+		return nil, err
+	}
+
 	for {
 		item := &SrtItem{}
 
-		str, err := readLine(reader)
-		if err != nil {
-			break
-		}
-		item.Counter, err = strconv.Atoi(str)
+		// process Counter
+		item.Counter, err = strconv.Atoi(counterLine)
 		if err != nil {
 			fmt.Println("parse Counter:", err)
 			break
 		}
 
-		str, err = readLine(reader)
+		// process TimeCode
+		str, err := readLine(reader)
 		if err != nil {
 			break
 		}
 		Str2TimeCode(str[0:12], &item.StartTime)
 		Str2TimeCode(str[17:29], &item.EndTime)
 
-		for {
-			str, err = readLine(reader)
-			if err != nil {
-				break
-			}
+		// process Text
+		counterLine, err = processText(reader, item)
 
-			item.Text = item.Text + str + "\n"
+		if debug {
+			fmt.Println("--------------------")
+			fmt.Printf("%v", item)
+			fmt.Println("--------------------")
 		}
-
 		l.PushBack(item)
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				return nil, err
+			}
+		}
 	}
 
 	return l, nil
