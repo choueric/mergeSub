@@ -13,5 +13,6 @@ mergeSub -i cd1.srt;cd2.srt -o output.srt -t 00:59:00,300
 * -t: offset between srt files. The format is same as the timecode in srt.
 
 # TODO
-- one SRT item may have empty line.
-- detect dos and unix formats and add option to specify one format in the output.
+- [x] Text section of a SRT item may have empty line.
+- [x] detect dos and unix formats and add option to specify the format (dos or unix)
+  for the output file.
