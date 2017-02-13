@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/list"
 	"errors"
 	"flag"
 	"fmt"
@@ -67,26 +66,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	fileNum := len(inputSubs)
-	srtLists := make([]*list.List, fileNum)
-	wait := make(chan int, fileNum)
+	wait := make(chan int, len(inputSubs))
 
-	for i, v := range inputSubs {
-		go func(index int, filename string, c chan int) {
-			srtLists[index], err = ReadSrtFile(filename)
+	srtFiles := []*SrtFile{}
+	for _, v := range inputSubs {
+		srt := &SrtFile{filename: v}
+		srtFiles = append(srtFiles, srt)
+		go func(srt *SrtFile, c chan int) {
+			err = srt.Read()
 			if err != nil {
 				fmt.Println("ReadStrFile:", err)
 				os.Exit(1)
 			}
 			c <- 1
-		}(i, v, wait)
+		}(srt, wait)
 	}
 
-	for i := 0; i < fileNum; i++ {
+	for i := 0; i < cap(wait); i++ {
 		<-wait
 	}
 
-	MergeSrt(srtLists, timeOffset)
+	mergedSrt, err := MergeSrt(srtFiles, timeOffset)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
-	WriteSrtFile(srtLists, outputSub)
+	mergedSrt.filename = outputSub
+	mergedSrt.Write()
 }

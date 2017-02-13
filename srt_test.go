@@ -93,7 +93,7 @@ func Test_Merge(t *testing.T) {
 	}
 	lists := []*list.List{list1, list2}
 
-	MergeSrt(lists, offset)
+	doMergeSrt(lists, offset)
 
 	var mergedSrt bytes.Buffer
 	writer := bufio.NewWriter(&mergedSrt)
@@ -124,7 +124,7 @@ func Test_MergeDos(t *testing.T) {
 	}
 	lists := []*list.List{list1, list2}
 
-	MergeSrt(lists, offset)
+	doMergeSrt(lists, offset)
 
 	var mergedSrt bytes.Buffer
 	writer := bufio.NewWriter(&mergedSrt)

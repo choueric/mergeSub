@@ -12,10 +12,10 @@ import (
 )
 
 /*
-The timecode format used is hours:minutes:seconds,milliseconds with time units
-fixed to two zero-padded digits and fractions fixed to three zero-padded digits
-(00:00:00,000). The fractional separator used is the comma.
-*/
+ * The timecode format used is hours:minutes:seconds,milliseconds with time
+ * units fixed to two zero-padded digits and fractions fixed to three
+ * zero-padded digits (00:00:00,000). The fractional separator used is the comma.
+ */
 type TimeCode struct {
 	time time.Time
 }
@@ -51,16 +51,26 @@ func (t *TimeCode) Add(str string) error {
 	return nil
 }
 
-type SrtItem struct {
+type SrtEntry struct {
 	Counter   int
 	StartTime TimeCode
 	EndTime   TimeCode
 	Text      string
 }
 
-func (i SrtItem) String() string {
-	return fmt.Sprintf("%d%s%v --> %v%s%s%s", i.Counter, lineEnd, i.StartTime,
-		i.EndTime, lineEnd, i.Text, lineEnd)
+func (e SrtEntry) String() string {
+	return fmt.Sprintf("%d%s%v --> %v%s%s%s", e.Counter, lineEnd, e.StartTime,
+		e.EndTime, lineEnd, e.Text, lineEnd)
+}
+
+type SrtFile struct {
+	filename  string
+	entryList *list.List
+}
+
+type SrtMerged struct {
+	filename       string
+	entryListArray []*list.List
 }
 
 func readLine(r *bufio.Reader) (string, error) {
@@ -73,7 +83,7 @@ func readLine(r *bufio.Reader) (string, error) {
 	return str, nil
 }
 
-func processText(reader *bufio.Reader, item *SrtItem) (string, error) {
+func processText(reader *bufio.Reader, entry *SrtEntry) (string, error) {
 	for {
 		str, err := readLine(reader)
 		if err != nil {
@@ -81,7 +91,7 @@ func processText(reader *bufio.Reader, item *SrtItem) (string, error) {
 		}
 
 		if str != "" {
-			item.Text = item.Text + str + lineEnd
+			entry.Text = entry.Text + str + lineEnd
 		} else {
 			for {
 				nextLine, err := readLine(reader)
@@ -92,7 +102,7 @@ func processText(reader *bufio.Reader, item *SrtItem) (string, error) {
 				if nextLine != "" {
 					return nextLine, nil
 				}
-				item.Text = item.Text + str + lineEnd
+				entry.Text = entry.Text + str + lineEnd
 			}
 		}
 	}
@@ -106,10 +116,10 @@ func doReadSrt(reader *bufio.Reader) (*list.List, error) {
 	}
 
 	for {
-		item := &SrtItem{}
+		entry := &SrtEntry{}
 
 		// process Counter
-		item.Counter, err = strconv.Atoi(counterLine)
+		entry.Counter, err = strconv.Atoi(counterLine)
 		if err != nil {
 			fmt.Println("parse Counter:", err)
 			break
@@ -120,18 +130,18 @@ func doReadSrt(reader *bufio.Reader) (*list.List, error) {
 		if err != nil {
 			break
 		}
-		Str2TimeCode(str[0:12], &item.StartTime)
-		Str2TimeCode(str[17:29], &item.EndTime)
+		Str2TimeCode(str[0:12], &entry.StartTime)
+		Str2TimeCode(str[17:29], &entry.EndTime)
 
 		// process Text
-		counterLine, err = processText(reader, item)
+		counterLine, err = processText(reader, entry)
 
 		if debug {
 			fmt.Println("--------------------")
-			fmt.Printf("%v", item)
+			fmt.Printf("%v", entry)
 			fmt.Println("--------------------")
 		}
-		l.PushBack(item)
+		l.PushBack(entry)
 
 		if err != nil {
 			if err == io.EOF {
@@ -145,19 +155,23 @@ func doReadSrt(reader *bufio.Reader) (*list.List, error) {
 	return l, nil
 }
 
-func ReadSrtFile(filename string) (*list.List, error) {
-	f, err := os.Open(filename)
+func (fi *SrtFile) Read() error {
+	f, err := os.Open(fi.filename)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer f.Close()
 
 	reader := bufio.NewReader(f)
-	return doReadSrt(reader)
+	fi.entryList, err = doReadSrt(reader)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func doWriteSrt(lists []*list.List, writer *bufio.Writer) error {
-	for _, l := range lists {
+func doWriteSrt(entryListArray []*list.List, writer *bufio.Writer) error {
+	for _, l := range entryListArray {
 		for e := l.Front(); e != nil; e = e.Next() {
 			fmt.Fprint(writer, e.Value)
 		}
@@ -167,26 +181,37 @@ func doWriteSrt(lists []*list.List, writer *bufio.Writer) error {
 	return nil
 }
 
-func WriteSrtFile(lists []*list.List, filename string) error {
-	f, err := os.Create(filename)
+func (sm *SrtMerged) Write() error {
+	f, err := os.Create(sm.filename)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
 	writer := bufio.NewWriter(f)
-	return doWriteSrt(lists, writer)
+	return doWriteSrt(sm.entryListArray, writer)
 }
 
-func MergeSrt(lists []*list.List, timeOffset []string) {
+func doMergeSrt(lists []*list.List, timeOffset []string) error {
 	len := len(timeOffset)
 	lastCounter := lists[0].Len()
 	for i := 1; i <= len; i++ {
 		for e := lists[i].Front(); e != nil; e = e.Next() {
-			item := e.Value.(*SrtItem)
-			item.Counter = item.Counter + lastCounter
-			item.StartTime.Add(timeOffset[i-1])
-			item.EndTime.Add(timeOffset[i-1])
+			entry := e.Value.(*SrtEntry)
+			entry.Counter = entry.Counter + lastCounter
+			entry.StartTime.Add(timeOffset[i-1])
+			entry.EndTime.Add(timeOffset[i-1])
 		}
 	}
+
+	return nil
+}
+
+func MergeSrt(srtArray []*SrtFile, timeOffset []string) (*SrtMerged, error) {
+	mergedSrt := &SrtMerged{}
+	for _, v := range srtArray {
+		mergedSrt.entryListArray = append(mergedSrt.entryListArray, v.entryList)
+	}
+	doMergeSrt(mergedSrt.entryListArray, timeOffset)
+	return mergedSrt, nil
 }
